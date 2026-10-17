@@ -1,5 +1,6 @@
 """Customer ownership and engagement state, separate from immutable source evidence."""
-import json, uuid
+import json, uuid, math, statistics
+from pathlib import PurePosixPath
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException
@@ -27,13 +28,30 @@ class Engagement(BaseModel):
     notes:str=Field('',max_length=4000)
 class Evidence(BaseModel):
     run_id:str
-    engagement_id:str
+    engagement_id:str=""
     final:bool=False
     exemplar:bool=False
 
 def validate_owner(db,customer_id,engagement_id):
     if not customer_id or not engagement_id:raise HTTPException(422,'Select both customer and engagement')
     if not db.execute('SELECT 1 FROM engagements WHERE id=? AND customer_id=?',(engagement_id,customer_id)).fetchone():raise HTTPException(422,'Engagement does not belong to this customer')
+
+def training_result(run):
+    """Only completed, source-backed training observations can become final evidence."""
+    meta=run.get('metadata',{})
+    if run.get('workload') in ('Unknown','NCCL',None) or run.get('status')!='passed' or meta.get('parent_job_failed') or meta.get('exit_failure'):return None
+    if run.get('source_kind') not in ('raw','upload') or not (run.get('source_path') or run.get('source',{}).get('path')):return None
+    metrics=run.get('metrics',[])
+    def positive(v):return isinstance(v,(int,float)) and math.isfinite(v) and v>0
+    values=[m[k] for m in metrics for k in ('time_ms','tflops_gpu') if k in m]
+    if not values or not all(positive(v) for v in values):return None
+    steps=[m for m in metrics if 'iteration' in m and 'time_ms' in m]
+    expected=meta.get('expected_iterations')
+    if not isinstance(expected,int) or expected<=0 or not steps or max(m['iteration'] for m in steps)!=expected:return None
+    if run.get('tflops_gpu') is not None and not positive(run['tflops_gpu']):return None
+    identity={k:meta.get(k) for k in ('model','model_name','model_size','precision','dtype','global_batch','global_batch_size','sequence_length') if meta.get(k) is not None}
+    identity['source_configuration']=str(PurePosixPath(meta.get('archive_member') or run.get('source_path','')).parent)
+    return dict(workload=run['workload'],configuration=identity,tflops_gpu=run.get('tflops_gpu'),mean_step_time_ms=statistics.mean(m['time_ms'] for m in steps),iterations=run.get('iterations'),source_path=run.get('source_path'),source_sha256=run.get('sha256') or run.get('source',{}).get('sha256'))
 
 @router.post('/customers')
 def create_customer(req:Customer):
@@ -88,19 +106,23 @@ def update_engagement(id:str,req:Engagement):
 @router.post('/customers/{id}/evidence')
 def attach_evidence(id:str,req:Evidence):
     with store.connection() as db:
-        init(db);validate_owner(db,id,req.engagement_id)
+        init(db)
+        if req.engagement_id:validate_owner(db,id,req.engagement_id)
+        elif not db.execute('SELECT 1 FROM customers WHERE id=?',(id,)).fetchone():raise HTTPException(404,'Customer not found')
         run=db.execute('SELECT status,workload,payload,source_kind FROM runs WHERE id=?',(req.run_id,)).fetchone()
         if not run:raise HTTPException(404,'Run not found')
         parsed=json.loads(run['payload'])
         if req.final or req.exemplar:
-            if run['status']!='passed' or not any('busbw_gbps' in m for m in parsed.get('metrics',[])) or parsed.get('metadata',{}).get('correctness_errors')!=0 or parsed.get('metadata',{}).get('parent_job_failed'):
-                raise HTTPException(422,'Final / Exemplar results require complete correctness-clean measured NCCL evidence')
+            nccl_valid=(run['workload']=='NCCL' and run['status']=='passed' and any('busbw_gbps' in m for m in parsed.get('metrics',[])) and all(isinstance(m['busbw_gbps'],(int,float)) and math.isfinite(m['busbw_gbps']) and m['busbw_gbps']>=0 for m in parsed.get('metrics',[]) if 'busbw_gbps' in m) and parsed.get('metadata',{}).get('correctness_errors')==0 and not parsed.get('metadata',{}).get('parent_job_failed'))
+            if not nccl_valid and not training_result({**parsed,'source_kind':run['source_kind']}):
+                raise HTTPException(422,'Final / Exemplar results require complete source-backed measured training or correctness-clean NCCL evidence')
         owner=db.execute('SELECT customer_id,engagement_id FROM customer_evidence WHERE run_id=?',(req.run_id,)).fetchone()
-        if owner and (owner[0]!=id or owner[1]!=req.engagement_id):raise HTTPException(409,'Run is already assigned to another engagement')
+        if owner and (owner[0]!=id or (owner[1] and owner[1]!=req.engagement_id)):raise HTTPException(409,'Run is already assigned to another engagement')
         # Cluster ownership must agree for imported evidence.
         cluster=parsed.get('cluster')
         for other in db.execute('SELECT id,clusters FROM customers WHERE id!=?',(id,)):
             if cluster in json.loads(other['clusters']):raise HTTPException(409,'Run belongs to a cluster assigned to another customer')
+        if owner and not owner['engagement_id']:db.execute('DELETE FROM customer_evidence WHERE customer_id=? AND run_id=? AND engagement_id=?',(id,req.run_id,''))
         db.execute('INSERT OR REPLACE INTO customer_evidence VALUES(?,?,?,?,?)',(id,req.engagement_id,req.run_id,req.final,req.exemplar))
     return dict(ok=True)
 
@@ -129,8 +151,30 @@ def customers():
                 best=dict(row);payload=json.loads(best.pop('payload'));best.pop('ranking')
                 best['point']=next((m for m in payload.get('metrics',[]) if m.get('busbw_gbps')==best['peak_bus_bw_gbps']),None)
                 item['best_performance'].append(best)
+            training=[]
+            for row in db.execute("SELECT payload,source_kind,sha256 FROM runs WHERE "+where+" AND workload NOT IN ('NCCL','Unknown') AND status='passed' AND source_kind IN ('raw','upload') AND (tflops_gpu IS NOT NULL OR iterations IS NOT NULL)",args):
+                parsed=json.loads(row['payload']);result=training_result({**parsed,'source_kind':row['source_kind'],'sha256':row['sha256']})
+                if result:training.append({**{k:parsed.get(k) for k in ('id','hardware','transport','nodes','gpus','collective','nccl_version')},**result})
+            item['valid_logs']+=len({r['source_sha256'] or r['id'] for r in training})
+            grouped={}
+            for result in training:
+                key=(result['workload'],result['hardware'],result['transport'],result['nodes'],result['gpus'],json.dumps(result['configuration'],sort_keys=True))
+                score=(result['tflops_gpu'] or 0,-result['mean_step_time_ms'])
+                if key not in grouped or score>(grouped[key]['tflops_gpu'] or 0,-grouped[key]['mean_step_time_ms']):grouped[key]=result
+            item['best_training_performance']=list(grouped.values())[:100]
+            item['training_configurations']=len(grouped)
+            item['evidence_total']=db.execute('SELECT COUNT(*) FROM customer_evidence WHERE customer_id=?',(c['id'],)).fetchone()[0]
             item['analyses']=[dict(r) for r in db.execute('SELECT id,engagement_id,filename,recipe_id,created_at FROM analyses WHERE customer_id=? ORDER BY created_at DESC LIMIT 30',(c['id'],))]
-            item['evidence']=[dict(r) for r in db.execute('SELECT e.*,r.title,r.status,r.hardware,r.nodes,r.gpus,r.collective,r.peak_bus_bw_gbps FROM customer_evidence e JOIN runs r ON r.id=e.run_id WHERE e.customer_id=? ORDER BY r.created_at DESC LIMIT 100',(c['id'],))]
+            item['evidence']=[dict(r) for r in db.execute('SELECT e.*,r.title,r.status,r.hardware,r.nodes,r.gpus,r.collective,r.workload,r.peak_bus_bw_gbps,r.tflops_gpu,r.payload FROM customer_evidence e JOIN runs r ON r.id=e.run_id WHERE e.customer_id=? ORDER BY r.created_at DESC LIMIT 100',(c['id'],))]
+            for evidence in item['evidence']:
+                payload=json.loads(evidence.pop('payload'));summary=training_result({**payload,'source_kind':payload.get('source_kind','upload')})
+                if summary:evidence.update(summary)
+            from .performance_api import run_assessments
+            displayed=item['best_performance']+item['best_training_performance']+item['evidence']
+            assessments=run_assessments([r.get('id') or r.get('run_id') for r in displayed if r.get('id') or r.get('run_id')])
+            for result in displayed:
+                evaluation=assessments.get(result.get('id') or result.get('run_id'))
+                if evaluation:result['performance']=evaluation
             items.append(item)
     return dict(items=items,count_policy='Validations deduplicate cluster + job ID, or SHA-256 when job ID is absent. Records include scheduler and result artifacts. Final and Exemplar are explicit engineer designations, not certification.')
 

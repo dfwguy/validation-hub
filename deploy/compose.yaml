@@ -1,0 +1,28 @@
+services:
+  validation-hub:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: nvis-ova-validation-hub:local
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../.env
+    environment:
+      VALIDATION_DATA_ROOT: /var/lib/validation-hub
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - validation-data:/var/lib/validation-hub
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=2g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 60s
+    # Mount operator-managed private integration files in a local override.
+    # Do not mount raw customer evidence or credentials into the build context.
+volumes:
+  validation-data:

@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from .security import scrub
 from .hostlist import expand_hostlist
 from contextlib import contextmanager
-DB_PATH = os.environ.get('VALIDATION_DB','/data/validation-hub/catalog/validation.sqlite')
+from .config import data_path
+DB_PATH = str(data_path('VALIDATION_DB','catalog/validation.sqlite'))
 
 @contextmanager
 def connection():

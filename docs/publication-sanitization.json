@@ -1,0 +1,43 @@
+{
+  "purpose": "Framework-only publication; operator data and source access are deployment-local",
+  "included": [
+    "Application Python modules and static web UI",
+    "Synthetic unit and integration tests",
+    "Generic ingestion, reference indexing and assessment tools",
+    "Dependency manifests, deployment templates and CI configuration",
+    "Framework documentation without deployed-site statistics"
+  ],
+  "excluded": [
+    "Customer uploads, logs, archives, manifests, receipts and analysis outputs",
+    "Catalog/reference SQLite databases and their WAL/SHM files",
+    "Parquet and data lake materializations",
+    "Downloaded wiki/source payloads, screenshots and raw/compact reference snapshots",
+    "Authentication files, cookies, headers, access tokens, SSH keys and credential stores",
+    "Production inventory, local server addresses, workstation paths and service logs",
+    "Deployment-specific remote inventory/mirroring and one-off recovery scripts",
+    "Virtual environments, bytecode caches and generated test/build artifacts"
+  ],
+  "runtime_configuration": {
+    "data_root": "VALIDATION_DATA_ROOT; checkout-local var/validation-hub default",
+    "data_overrides": ["VALIDATION_DB", "VALIDATION_UPLOADS", "BEACON_DB", "BEACON_NCCL_DB", "CONFLUENCE_EVIDENCE_DB", "CONFLUENCE_EVIDENCE_DIR", "NCCL_DASHBOARD_SNAPSHOTS"],
+    "official_service_defaults": ["BEACON_BASE_URL", "BEACON_API_URL", "GPUCOMMS_URL", "NCCL_DASHBOARD_URL", "ATLASSIAN_SITE"],
+    "no_tenant_default": "ATLASSIAN_CLOUD_ID must be supplied to enable authenticated Confluence reads",
+    "credential_references_only": ["BEACON_HEADERS_FILE", "BEACON_COOKIE_FILE", "ATLASSIAN_TOKEN_FILE"]
+  },
+  "integration_claims": {
+    "exemplar": "Source-backed local recipes, analysis and script generation; no remote upload/write or certification connector",
+    "beacon": "Authenticated read-only training API or authorized export import; no bundled records",
+    "gpucomms": "Public source-session NCCL read/index connector; optional browser tooling is not bundled",
+    "nccl_dashboard": "Observed-curve catalog read/index connector; target and SOL curves are not measured references",
+    "confluence": "Operator-configured GET-only evidence discovery and measured-candidate extraction; no bundled corpus",
+    "nvbugspro": "No authenticated query, synchronization, bug matching or issue creation implementation"
+  },
+  "deployment_boundary": {
+    "workers": 1,
+    "default_host_binding": "127.0.0.1:8081",
+    "access_control": "Requires operator-managed authenticated TLS reverse proxy; application has no built-in login or customer RBAC",
+    "storage": "Writable persistent data volume; empty startup requires no customer or source data",
+    "container_validation": "Container build and Docker Compose runtime require validation on a Docker-capable host; not executed during local packaging audit"
+  },
+  "review_scope": "This manifest states publication boundaries, not a claim that imported operator evidence is automatically anonymized. Final tracked-file and secret scanning is required before publication."
+}

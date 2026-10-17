@@ -94,10 +94,10 @@ def test_scrub_and_observed_transport():
 
 def test_slurm_roster_expansion_and_limits():
     from backend.hostlist import expand_hostlist
-    hosts=expand_hostlist('gpu-site01-h16-[11-18,28-37],gpu-site01-h17-[11-18,28-37]')
+    hosts=expand_hostlist('ink50-dh01-h16-[11-18,28-37],ink50-dh01-h17-[11-18,28-37]')
     assert len(hosts)==36
-    assert hosts[0]=='gpu-site01-h16-11'
-    assert hosts[-1]=='gpu-site01-h17-37'
+    assert hosts[0]=='ink50-dh01-h16-11'
+    assert hosts[-1]=='ink50-dh01-h17-37'
     with pytest.raises(ValueError):expand_hostlist('node[1-9999999]')
 
 

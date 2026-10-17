@@ -1,0 +1,13 @@
+**
+!requirements.lock
+!backend/
+!backend/**/*.py
+!frontend/
+!frontend/*.html
+!frontend/*.css
+!frontend/*.js
+!tools/
+!tools/*.py
+backend/**/__pycache__/
+tools/**/__pycache__/
+**/*.pyc
