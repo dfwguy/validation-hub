@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="380" viewBox="0 0 1440 380" role="img" aria-labelledby="title desc">
+<title id="title">NVIDIA NVIS OVA Validation Hub</title><desc id="desc">An evidence-to-performance engineering workspace. Upload, compare, investigate and improve. NVIDIA green and charcoal banner with an original GPU validation project mark.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#17251d"/><stop offset="1" stop-color="#080d0a"/></linearGradient><linearGradient id="g" x2="1" y2="1"><stop stop-color="#a8df53"/><stop offset="1" stop-color="#76b900"/></linearGradient></defs>
+<rect width="1440" height="380" rx="22" fill="url(#bg)"/>
+<g fill="none" stroke="#294332" opacity=".55"><path d="M1100 0V380M1160 0V380M1220 0V380M1280 0V380M1340 0V380M1400 0V380M1040 60H1440M1040 120H1440M1040 180H1440M1040 240H1440M1040 300H1440"/></g>
+<circle cx="160" cy="164" r="112" fill="#14251b" stroke="#355338"/>
+<g stroke="#58843e" stroke-width="4" fill="none"><path d="M160 62V98M160 230V266M58 164H94M226 164H262M88 92L112 116M208 212L232 236M88 236L112 212M208 116L232 92"/></g>
+<rect x="98" y="102" width="124" height="124" rx="28" fill="url(#g)"/><rect x="111" y="115" width="98" height="98" rx="19" fill="#15251a"/>
+<path d="M129 164L150 185L193 143" fill="none" stroke="#c1f387" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="#b1e46a"><circle cx="160" cy="62" r="6"/><circle cx="58" cy="164" r="6"/><circle cx="262" cy="164" r="6"/></g>
+<g font-family="Arial,Helvetica,sans-serif"><text x="320" y="63" fill="#76b900" font-size="23" font-weight="700" letter-spacing="5">NVIDIA</text>
+<text x="320" y="126" fill="#fff" font-size="48" font-weight="700">NVIS OVA Validation Hub</text>
+<text x="320" y="175" fill="#dfebdf" font-size="24">Turn validation evidence into performance decisions.</text>
+<text x="320" y="214" fill="#9fb4a2" font-size="18">GPU recipes · Training benchmarks · NCCL · Crash investigation</text>
+<g font-size="15" font-weight="700" letter-spacing="1"><rect x="320" y="245" width="180" height="34" rx="17" fill="#29431f"/><text x="410" y="267" text-anchor="middle" fill="#c8ef9d">AGENT READY</text><rect x="512" y="245" width="230" height="34" rx="17" fill="#20352a"/><text x="627" y="267" text-anchor="middle" fill="#c4dbc7">EVIDENCE FIRST</text><rect x="754" y="245" width="237" height="34" rx="17" fill="#20352a"/><text x="872" y="267" text-anchor="middle" fill="#c4dbc7">PORTABLE FRAMEWORK</text></g>
+<path d="M83 326H1346" stroke="#35523d" stroke-width="2"/>
+<g fill="#76b900"><circle cx="83" cy="326" r="5"/><circle cx="425" cy="326" r="5"/><circle cx="788" cy="326" r="5"/><circle cx="1130" cy="326" r="5"/></g>
+<g fill="#d7e5d7" font-size="16" font-weight="700"><text x="102" y="351">UPLOAD EVIDENCE</text><text x="444" y="351">COMPARE PERFORMANCE</text><text x="807" y="351">INVESTIGATE</text><text x="1149" y="351">IMPROVE &amp; RETEST</text></g></g>
+</svg>

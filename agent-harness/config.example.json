@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "project_name": "validation-hub-geo",
+  "runtime_dir": "/absolute/private/validation-hub-runtime",
+  "persistent_volume": "validation-hub-geo-data",
+  "host_port": 8081,
+  "startup_timeout_seconds": 120,
+  "environment_file": null,
+  "secrets_dir": null,
+  "secrets_read_only": true
+}

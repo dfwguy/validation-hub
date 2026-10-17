@@ -37,3 +37,7 @@ __pycache__/
 htmlcov/
 test-results.xml
 .DS_Store
+
+# Release outputs and local harness inputs
+dist/
+agent-harness/config.local.json

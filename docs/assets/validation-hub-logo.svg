@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+<title id="title">NVIS OVA Validation Hub project mark</title><desc id="desc">A validation check inside a GPU chip, connected to three evidence nodes, in NVIDIA green on charcoal.</desc>
+<rect width="240" height="240" rx="48" fill="#111916"/>
+<g stroke="#47723e" stroke-width="4" fill="none"><path d="M120 26V54M120 186V214M26 120H54M186 120H214M52 52L72 72M168 168L188 188M52 188L72 168M168 72L188 52"/></g>
+<rect x="56" y="56" width="128" height="128" rx="29" fill="#76b900"/>
+<rect x="70" y="70" width="100" height="100" rx="20" fill="#15251a"/>
+<path d="M88 120L110 142L153 98" fill="none" stroke="#b5ed64" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="#d6f7ad"><circle cx="120" cy="26" r="7"/><circle cx="26" cy="120" r="7"/><circle cx="214" cy="120" r="7"/></g>
+</svg>

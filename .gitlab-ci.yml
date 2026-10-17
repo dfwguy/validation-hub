@@ -2,6 +2,13 @@ stages:
   - test
   - package
 
+default:
+  tags:
+    - size/medium
+    - type/docker
+    - os/linux
+  interruptible: true
+
 variables:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PYTHONDONTWRITEBYTECODE: "1"
@@ -17,9 +24,12 @@ test-python:
   image: python:3.14-slim
   stage: test
   script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends git
     - python -m pip install -r requirements.lock
+    - python -m pip check
     - python tools/check_publication.py
-    - python -m compileall -q backend tools
+    - python tools/check_docs.py
+    - python -m compileall -q backend tools agent-harness tests
     - python -m pytest -q --junitxml=test-results.xml
   artifacts:
     when: always
@@ -33,6 +43,18 @@ test-javascript:
   script:
     - node --check frontend/app.js
     - node --check frontend/workflows.js
+
+package-source:
+  image: python:3.14-slim
+  stage: package
+  script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends git
+    - python tools/package_release.py --output dist
+  artifacts:
+    paths:
+      - dist/nvis-ova-validation-hub.tar.gz
+      - dist/SHA256SUMS
+    expire_in: 90 days
 
 # Opt-in image build for an approved tag and a Docker-capable GitLab runner.
 # This job requires a privileged Docker-in-Docker runner; it does not deploy.
