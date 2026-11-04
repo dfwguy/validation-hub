@@ -56,7 +56,7 @@ Optional benchmark-context JSON captures information the operator knows, such as
 | Tool | What it does | Evidence boundary |
 | --- | --- | --- |
 | Configuration checks | Compares recorded environment/configuration with a versioned GPU/fabric recipe | Unknown firmware, topology or site policy cannot be inferred from a selected recipe |
-| Crash analyzer | Groups recognized signatures and preserves file/line excerpts | A signature suggests an investigation path; it does not prove root cause |
+| Crash analyzer | Groups recognized signatures with file/line excerpts, decodes Xid codes and lists the hosts named in the log ([details](docs/crash-evidence.md)) | A signature or Xid points to where to look; it doesn't prove root cause, and a host that logged an error isn't necessarily the faulty one |
 | Follow-up tests | Explains diagnostic actions, expected outcomes, applicability and cautions | Recommendations do not automatically change infrastructure |
 | NCCL script generator | Produces a downloadable Slurm launcher with correctness checks and repeated measurements | Generation does not submit a job or run a test |
 
@@ -224,7 +224,7 @@ node --check frontend/workflows.js
 
 GitLab CI runs Python/application/harness tests, publication and documentation checks, and JavaScript syntax checks on the Factory Linux Docker runner tags. A source-package job produces the committed software archive with a per-file manifest and SHA-256 checksum. Container image building is opt-in for an approved release tag with `BUILD_CONTAINER=1` and a suitably configured Docker-capable runner. CI does not deploy another geography or submit hardware jobs.
 
-The current local framework suite reports **227 passing tests**, including provider-neutral deployment orchestration and source-release integrity tests; see the [validation record](docs/validation.md) for evidence and limits. Browser checks and synthetic regressions validate application behavior; they do not establish a real cluster's performance. Container build/start and target-environment commissioning remain separate checks where not yet performed.
+The current local framework suite reports **260 passing tests**, including provider-neutral deployment orchestration and source-release integrity tests; see the [validation record](docs/validation.md) for evidence and limits. Browser checks and synthetic regressions validate application behavior; they do not establish a real cluster's performance. Container build/start and target-environment commissioning remain separate checks where not yet performed.
 
 [Published source history](docs/source-history.md) identifies the earliest retained framework snapshot and enhancement branch. That snapshot is not an invented pre-session origin. The [future MR draft](docs/merge-request-draft.md) and [Slack announcement draft](docs/slack-announcement.md) are review artifacts, not evidence that a merge request or announcement has been posted.
 
@@ -233,6 +233,7 @@ The current local framework suite reports **227 passing tests**, including provi
 | Guide | Read it for |
 | --- | --- |
 | [Product workflow](docs/product-workflow.md) | Upload, investigation, engagement and test-generation behavior |
+| [Crash evidence](docs/crash-evidence.md) | Xid decoding, host lists and the repeat-host roll-up |
 | [Comparison policy](docs/comparison-policy.md) | Exact versus contextual matching, statistics and qualification |
 | [Reference integrations](docs/reference-integrations.md) | Implemented adapters, private authentication and source receipts |
 | [Architecture](docs/architecture.md) | Data flow, persistence and module responsibilities |

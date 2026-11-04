@@ -13,7 +13,7 @@ The progress bar measures transfer. Saving, unpacking, parsing and assessment co
 The saved report brings together four tools:
 
 1. **Checks:** compare available configuration evidence against a versioned GPU/fabric recipe. Missing firmware, topology, transport or site-policy evidence stays unknown.
-2. **Crash analyzer:** group recognized signatures with source-file and line excerpts. Parent-job failure, scheduler termination and numerical failures remain distinct from individual-file NCCL correctness.
+2. **Crash analyzer:** group recognized signatures with source-file and line excerpts, decode Xid codes and list the hosts named in the log ([details](crash-evidence.md)). Parent-job failure, scheduler termination and numerical failures remain distinct from individual-file NCCL correctness.
 3. **Follow-up tests:** explain what to collect, why it helps and the expected outcome. Source guidance includes applicability and cautions; infrastructure changes are not executed automatically.
 4. **NCCL script generator:** produce a downloadable launcher using the chosen recipe and site-supplied paths/interfaces.
 

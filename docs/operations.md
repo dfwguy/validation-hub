@@ -35,6 +35,7 @@ Credential scrubbing is defensive processing, not proof that every arbitrary log
 - Large UI lists are capped/paginated with explicit totals. The simplified NCCL comparison contains only 16/32 GiB; other raw measurements remain retained.
 - NCCL script generation currently supports maximum 16 GiB, even though imported 32 GiB measurements can be compared.
 - Generated launchers require Slurm/Pyxis/Enroot/PMIx and compatible MPI nccl-tests. They are reviewable artifacts, not remote execution.
+- Host attribution is capped per analysis (5,000 tracked keys, top 25 shown). The cross-analysis roll-up reads the newest 500 saved analyses by default, and reports saved before it existed have no host data. See [crash evidence](crash-evidence.md).
 - Unknown or incomplete context cannot establish a qualified baseline. Crash signatures are leads and do not prove root cause.
 - Background jobs are process-managed. Multi-worker/distributed operation requires additional coordination work.
 - External source availability and session expiry can limit refresh. Previously imported receipts remain visible; unavailable access must not be presented as fresh coverage.

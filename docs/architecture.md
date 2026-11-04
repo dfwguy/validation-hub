@@ -24,7 +24,7 @@ flowchart LR
 | Upload and lake | `backend/upload_io.py`, `backend/lake.py` | Streaming receipt, SHA-256, bounded archive handling and evidence inventory |
 | Parsing and comparison | `backend/parser.py`, `backend/compare.py` | Measured results, execution evidence and exact baseline comparison |
 | Performance | `backend/assessment.py`, `backend/performance.py`, `backend/nccl_reference.py`, `backend/nccl_summary.py` | Training and NCCL matching, assessments and compact 16/32 GiB summaries |
-| Investigation | `backend/investigation.py`, troubleshooting modules | Configuration/crash findings, source-backed next tests |
+| Investigation | `backend/investigation.py`, troubleshooting modules, `backend/crash_enrichment.py` | Configuration/crash findings, Xid decoding, host lists, source-backed next tests |
 | Recipes | `backend/recipes.py` | Versioned GPU/fabric profiles and downloadable test launchers |
 | Customers | `backend/engagements.py` | Ownership, engagement state, evidence links and result designations |
 | Sources | `backend/beacon.py`, `backend/beacon_nccl.py`, `backend/wiki_sources.py` | Separate reference catalogs, snapshots and indexed guidance |

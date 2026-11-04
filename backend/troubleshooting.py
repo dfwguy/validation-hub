@@ -6,6 +6,7 @@ from pathlib import PurePosixPath, Path
 from .parser import parse_log
 from .recipes import profile, VERSION
 from .security import scrub
+from . import crash_enrichment
 from .upload_io import DiskLog, disk_texts, search, findall
 
 LIMIT=32*1024*1024
@@ -57,7 +58,7 @@ SIGNATURES=[
  ('rdma','RDMA completion / fabric failure',r'ibv_poll_cq.*(?:error|failed)|Got completion.*(?:error|status)|IB.*(?:retry exceeded|error 12)|transport retry counter exceeded','Inspect the affected port counters and link health; reproduce on the same node pair before changing timeouts.'),
  ('bootstrap','Bootstrap connectivity failure',r'No route to host|Connection refused|Network is unreachable|Bootstrap.*(?:failed|no socket)|socketStartConnect.*failed','Verify bootstrap interface, routing, firewall and name resolution on every allocated node.'),
  ('memory','GPU or host memory exhaustion',r'CUDA out of memory|out of memory|OOM-kill|cudaErrorMemoryAllocation','Reduce maximum message size and inspect free memory and competing processes; rerun with correctness enabled.'),
- ('cuda','CUDA / GPU failure',r'unhandled cuda error|illegal memory access|Xid\s*[:=]?\s*\d+|CUDA error|GPU has fallen off','Capture nvidia-smi -q and kernel Xid evidence; isolate the GPU and test locally.'),
+ ('cuda','CUDA / GPU failure',r'unhandled cuda error|illegal memory access|'+crash_enrichment.XID_PATTERN+r'|CUDA error|GPU has fallen off','Capture nvidia-smi -q and kernel Xid evidence; isolate the GPU and test locally.'),
  ('timeout','Timeout / stalled rank',r'Watchdog.*(?:timeout|timed out)|DUE TO TIME LIMIT|collective.*timed out|NCCL (?:WARN|ERROR).*timeout','Find the first failing rank and preceding errors; check fabric and allocation before increasing timeout.'),
  ('imex','NVLink / IMEX domain failure',r'(?:IMEX|MNNVL|NVLS).*(?:failed|error|unavailable)','Verify allocation membership, NVLink fabric health and required IMEX access for the selected GB system.'),
  ('runtime','Runtime / library mismatch',r'undefined symbol|error while loading shared libraries|libnccl.*not found|libcuda.*not found','Check container driver compatibility, MPI and loaded NCCL library versions across all nodes.'),
@@ -116,18 +117,19 @@ def analyze(entries,recipe_id):
     evidence_patterns=[r'Using network (?:IB|[\w-]*IB[\w-]*)|NET/IB.*(?:Using|mlx5)',r'Using network Socket',r'Link layer\s*:\s*Ethernet',r'Link layer\s*:\s*InfiniBand',r'ACSCtl:.*(?:ReqRedir\+|CmpltRedir\+)',r'\bpowersave\b']
     evidence_flags={pattern:False for pattern in evidence_patterns}
     accum={key:dict(count=0,hits=[]) for key,_,_,_ in SIGNATURES}
+    collector=crash_enrichment.Collector()
     def evidence_has(pattern,flags=0):return evidence_flags.get(pattern,False)
     for name,text in entries:
         r=parse_log(text.parser_lines() if isinstance(text,DiskLog) else text.splitlines(),name);r['metadata']['recipe_id']=recipe_id
         if r['workload'] in ('Llama','Unknown'):
             identified=next((label for token,label in [('deepseek','DeepSeek'),('kimi','Kimi'),('qwen','Qwen'),('gpt-oss','GPT-OSS'),('gpt_oss','GPT-OSS'),('nemotron','Nemotron'),('llama','Llama')] if token in name.lower()),None)
             r['workload']=identified or ('Training' if r['workload']=='Llama' else 'Unknown')
-        has_crash=False
+        has_crash=False;collector.start_file()
         for key,_,pattern,_ in SIGNATURES:
             candidates=text.matches(pattern,re.I) if isinstance(text,DiskLog) else ((n,line) for n,line in enumerate(text.splitlines(),1) if re.search(pattern,line,re.I))
             for line_no,line in candidates:
                 if key=='runtime' and not runtime_failure(line):continue
-                has_crash=True;accum[key]['count']+=1
+                has_crash=True;accum[key]['count']+=1;collector.observe(key,line,name,line_no)
                 if len(accum[key]['hits'])<8:accum[key]['hits'].append(dict(file=name,line=line_no,excerpt=scrub(line[:700])))
         if has_crash:r['metadata']['exit_failure']=True;r['status']='failed'
         for pattern in evidence_patterns:
@@ -166,7 +168,10 @@ def analyze(entries,recipe_id):
     socket=bool(evidence_has(r'Using network Socket',re.I))
     check('rdma','Observed data transport','fail' if socket else 'pass' if observed_rdma else 'unknown','RDMA selected; NET/IB also names the RoCE verbs transport', 'RDMA observed' if observed_rdma else 'Socket observed' if socket else None)
     for key,title,pattern,advice in SIGNATURES:
-        if accum[key]['count']:groups.append(dict(id=key,title=title,count=accum[key]['count'],evidence=accum[key]['hits'],next_action=advice,confidence='signature match; cause requires verification'))
+        if accum[key]['count']:
+            group=dict(id=key,title=title,count=accum[key]['count'],evidence=accum[key]['hits'],next_action=advice,confidence='signature match; cause requires verification',hosts=collector.signature_hosts(key))
+            if key=='cuda':group['xids']=collector.xids()
+            groups.append(group)
     correctness=[r['metadata'].get('correctness_errors') for r in measured]
     failed=any(r['status']=='failed' for r in measured) or any(any(m.get('errors') for m in r['metrics']) for r in measured)
     check('correctness','NCCL correctness','fail' if failed else 'pass' if measured and all(r['status']=='passed' for r in measured) else 'unknown','Complete test and zero correctness errors',correctness)
@@ -182,12 +187,20 @@ def analyze(entries,recipe_id):
     if groups:check('crash','Crash evidence','fail','Resolve observed crash signatures before accepting results',sum(g['count'] for g in groups))
     tests=followups(p,groups,checks)
     verdict='fail' if any(c['status']=='fail' for c in checks) else 'needs_evidence'
-    return scrub(dict(recipe=p,policy_version=VERSION,verdict=verdict,checks=checks,crashes=groups,follow_up_tests=tests,
+    return scrub(dict(recipe=p,policy_version=VERSION,verdict=verdict,checks=checks,crashes=groups,host_attribution=collector.attribution(),follow_up_tests=tests,
                       files=[dict(filename=r['filename'],sha256=r['sha256'],status=r['parsed']['status'],metrics=len(r['parsed']['metrics'])) for r in runs],
                       runs=runs,environment={k:sorted(v) for k,v in env.items()},
                       limitations=['Checks apply to the uploaded evidence only. Missing settings remain unknown.',
                                    'Crash signatures suggest investigations; they are not a confirmed root cause.',
+                                   "Xid meanings and hosts come only from the matching log lines. A host that logged an error isn't necessarily at fault.",
                                    'Recipe defaults do not certify site firmware, switch policy or complete allocation health.']))
+
+def crash_command(group):
+    """Append catalog guidance only for Xids the log actually reported."""
+    lines=[group['next_action']]
+    for x in group.get('xids',()):
+        if x['domain'] in crash_enrichment.NODE_ACTION_DOMAINS:lines.append(f"Xid {x['code']} ({x['name']}, {x['count']}x): {x['action']}")
+    return '\n'.join(lines)
 
 def followups(p,groups=(),checks=()):
     ids={g['id'] for g in groups}
@@ -197,6 +210,6 @@ def followups(p,groups=(),checks=()):
            dict(id='tune',title='Controlled NCCL tuning',priority=4,reason='After correctness and fabric health pass, change one variable per run.',command='Keep default NCCL_ALGO/NCCL_PROTO as control. Compare Ring vs Tree only where supported, then restore defaults.',success='At least 3 repeats, same topology and size; retain median and spread. Accept only stable gains.')]
     if p['fabric']=='infiniband':tests.append(dict(id='fabric',title='InfiniBand fabric diagnostics',priority=1 if 'rdma' in ids else 3,reason='Check link health before changing NCCL timeouts.',command='ibstat\nibdiagnet',success='Fabric operator reviews unhealthy links, routing and increasing error counters.'))
     else:tests.append(dict(id='fabric',title='Spectrum-X RoCE and congestion review',priority=1 if 'rdma' in ids else 3,reason='Verify Ethernet/RDMA selection and site congestion policy.',command='rdma link show\nibdev2netdev\n# Ask fabric operator for per-port PFC, ECN, drops and congestion counters.',success='Correct GPU-facing ports, approved QoS and firmware; no unexplained drops.'))
-    for g in groups:tests.append(dict(id='crash-'+g['id'],title=g['title'],priority=1,reason='Triggered by crash evidence.',command=g['next_action'],success='Reproduce and verify the fix on the same allocation.'))
+    for g in groups:tests.append(dict(id='crash-'+g['id'],title=g['title'],priority=1,reason='Triggered by crash evidence.',command=crash_command(g),success='Reproduce and verify the fix on the same allocation.'))
     if any(c['id']=='cpu' for c in checks):tests.append(dict(id='cpu',title='CPU launch overhead',priority=2,reason='Power governor evidence warrants a CPU-sensitive follow-up.',command='USE_CASES="kernel_launch" llmb-run submit -w microbenchmark_cpu_overhead --dtype mxfp4 --scale 1',success='Review launch latency and clocks under load against a matching CPU reference.'))
     return sorted(tests,key=lambda t:t['priority'])

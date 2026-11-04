@@ -15,3 +15,14 @@ Validated the sanitized enhancement checkout on 2026-10-17 using Python 3.14:
 The application tests use the existing compatible Python environment; this does not establish a fresh dependency installation or a container build. Docker and Compose were unavailable on the packaging host, so image build/start remain to be verified on a Docker-capable runner. CI jobs are supplied for Python tests, JavaScript syntax and an opt-in tagged image build. A configured pipeline is not itself a passing pipeline result.
 
 Shared deployment requires an authenticated TLS reverse proxy and authorized, deployment-local source credentials. No production deployment or evidence migration was performed by publication.
+
+## Crash evidence (Xid decoding, host lists)
+
+Checked 2026-11-04 on Python 3.14.10 with synthetic logs:
+
+- `pytest`: 260 passed (227 existing, 33 new). Same Starlette/httpx warning as before.
+- `compileall`, `check_publication.py`, `check_docs.py`, `node --check` on both frontend files and `pip check` pass.
+- Uploaded synthetic crash logs to a local instance and opened the Crash analyzer tab in headless Chrome. The Xid table and host list render, and a report saved before this change still renders.
+- The Xid table was checked against NVIDIA's Xid catalog.
+
+Not checked: real cluster logs, the container image, very large archives. The `cuda` pattern now accepts Xid codes of up to three digits, so `xid=12345` no longer counts as a crash.

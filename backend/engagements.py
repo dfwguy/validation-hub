@@ -3,8 +3,8 @@ import json, uuid, math, statistics
 from pathlib import PurePosixPath
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException
-from . import store
+from fastapi import APIRouter, HTTPException, Query
+from . import store, crash_enrichment
 
 router=APIRouter(prefix='/api')
 def now():return datetime.now(timezone.utc).isoformat()
@@ -184,3 +184,16 @@ def get_analysis(id:str):
         init(db);row=db.execute('SELECT report FROM analyses WHERE id=?',(id,)).fetchone()
     if not row:raise HTTPException(404,'Analysis not found')
     return json.loads(row[0])
+
+@router.get('/host-attribution')
+def host_attribution(cluster:str|None=Query(None,max_length=120),min_analyses:int=Query(2,ge=1,le=1000),limit:int=Query(50,ge=1,le=200),max_analyses:int=Query(500,ge=1,le=5000)):
+    """Hosts that recur across saved crash analyses (newest `max_analyses` considered).
+
+    Counts one per analysis. This is a lead for the operator, not a fault finding.
+    """
+    with store.connection() as db:
+        init(db)
+        rows=db.execute("SELECT id,filename,created_at,json_extract(report,'$.host_attribution') AS attribution FROM analyses WHERE json_extract(report,'$.host_attribution') IS NOT NULL AND (? IS NULL OR json_extract(report,'$.cluster')=?) ORDER BY created_at DESC LIMIT ?",(cluster,cluster,max_analyses)).fetchall()
+    result=crash_enrichment.aggregate([dict(id=r['id'],filename=r['filename'],created_at=r['created_at'],host_attribution=json.loads(r['attribution'])) for r in rows],min_analyses,limit)
+    result['cluster']=cluster
+    return result
